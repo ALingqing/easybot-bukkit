@@ -49,20 +49,20 @@ public class PlayerDeathSyncEvents implements Listener {
                                 I18n.render(customName, Locale.CHINESE)
                         );
                     }
-                } catch (NoSuchMethodError ignored) {
+                } catch (Throwable ignored) {
                     try {
                         @SuppressWarnings("deprecation")
                         String legacyCustomName = damager.getCustomName();
                         if (legacyCustomName != null) {
                             return legacyCustomName;
                         }
-                    } catch (NoSuchMethodError ignored2) {
+                    } catch (Throwable ignored2) {
                     }
                 }
 
                 Component translated = I18n.render(damager.name(), Locale.CHINESE);
                 return LegacyComponentSerializer.legacySection().serializeOrNull(translated);
-            } catch (NoSuchMethodError ignored) {
+            } catch (Throwable ignored) {
             }
 
 
@@ -96,12 +96,17 @@ public class PlayerDeathSyncEvents implements Listener {
         String deathMessage = null;
 
         if (hasModernMessageApi) {
-            Component component = event.deathMessage();
-            if (component != null) {
-                Component translated = I18n.render(component, Locale.CHINESE);
-                deathMessage = LegacyComponentSerializer.legacySection().serializeOrNull(translated);
+            try {
+                Component component = event.deathMessage();
+                if (component != null) {
+                    Component translated = I18n.render(component, Locale.CHINESE);
+                    deathMessage = LegacyComponentSerializer.legacySection().serializeOrNull(translated);
+                }
+            } catch (Throwable ignored) {
+                // Adventure 接口变动（如 26.x）时不要影响死亡同步, 下面回退到旧接口
             }
-        } else {
+        }
+        if (deathMessage == null) {
             //noinspection deprecation
             deathMessage = event.getDeathMessage();
         }
@@ -110,14 +115,23 @@ public class PlayerDeathSyncEvents implements Listener {
             deathMessage = event.getEntity().getName() + "  died";
         }
         final String message = deathMessage;
-
-
-        String killer = getKiller(event.getEntity());
+        final String killer = safeGetKiller(event.getEntity());
 
         Easybot.EXECUTOR.execute(() -> {
             Easybot
                     .getClient()
                     .syncDeathMessage(playerInfo, message, killer);
         });
+    }
+
+    /**
+     * 击杀者获取整体兜底: 26.x 上名字/翻译相关接口有变动时不应该影响死亡同步
+     */
+    private String safeGetKiller(Player player) {
+        try {
+            return getKiller(player);
+        } catch (Throwable ignored) {
+            return "一股神秘的力量";
+        }
     }
 }
