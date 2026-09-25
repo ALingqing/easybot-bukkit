@@ -15,6 +15,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # gradle-wrapper.properties 配的是腾讯云镜像（国内快），但 GitHub 托管 runner 在海外，
+      # 下该镜像会 Read timed out，所以只在 CI 里换成官方源。
+      - name: Use official Gradle distribution in CI
+        run: |
+          sed -i 's#mirrors\.cloud\.tencent\.com/gradle/#services.gradle.org/distributions/#' gradle/wrapper/gradle-wrapper.properties
+          grep distributionUrl gradle/wrapper/gradle-wrapper.properties
+
       - name: Set up JDK 25 (compile toolchain)
         id: jdk25
         uses: actions/setup-java@v4
